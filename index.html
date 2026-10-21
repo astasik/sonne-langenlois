@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sonne Langenlois</title>
+<meta name="description" content="Live-Sonnenschein der TAWES-Station Langenlois und 24-Stunden-Prognose">
+<meta name="theme-color" content="#14110c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  --bg:#f6f2ea;--card:#fffdf8;--ink:#1d1a15;--mute:#6f675b;--line:#e6dfd2;
+  --sun:#f2a516;--sun2:#ffd36b;--fc:#e8b04a;--cloud:#9aa3ad;--night:#5b6478;--warn:#b5462f;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14110c;--card:#1e1a14;--ink:#f3ede2;--mute:#a79e8f;--line:#332d24;
+  --sun:#ffb627;--sun2:#ffd877;--fc:#c99232;--cloud:#6f7884;--night:#8590a8;--warn:#ff8a6b;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:640px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:4px 0 14px}
+h1{font-size:1.25rem;margin:0;letter-spacing:-.01em}
+.sub{color:var(--mute);font-size:.82rem}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+button:active{transform:scale(.97)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.orb{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;font-size:44px;transition:all .4s}
+.orb.on{background:radial-gradient(circle,var(--sun2),var(--sun));box-shadow:0 0 0 8px color-mix(in srgb,var(--sun) 22%,transparent),0 0 40px var(--sun)}
+.orb.off{background:color-mix(in srgb,var(--cloud) 35%,transparent)}
+.orb.night{background:color-mix(in srgb,var(--night) 35%,transparent)}
+.status{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.statusSub{color:var(--mute);font-size:.9rem;margin-top:2px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.kpi{background:color-mix(in srgb,var(--line) 45%,transparent);border-radius:12px;padding:10px}
+.kpi b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi span{color:var(--mute);font-size:.75rem}
+h2{font-size:.95rem;margin:0 0 2px}
+.h2sub{color:var(--mute);font-size:.8rem;margin-bottom:10px}
+svg{display:block;width:100%;height:auto}
+svg text{fill:var(--mute);font-size:10px;font-family:inherit}
+.strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.hr{flex:0 0 56px;text-align:center;border-radius:12px;padding:8px 4px;background:color-mix(in srgb,var(--line) 40%,transparent);scroll-snap-align:start}
+.hr .t{font-size:.75rem;color:var(--mute)}
+.hr .i{font-size:1.3rem;margin:2px 0}
+.hr .m{font-weight:600;font-variant-numeric:tabular-nums;font-size:.9rem}
+.hr .c{font-size:.72rem;color:var(--mute)}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:.9rem;padding:6px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row span:first-child{color:var(--mute)}
+.err{color:var(--warn);font-size:.85rem;margin-top:8px}
+footer{color:var(--mute);font-size:.72rem;text-align:center;margin-top:18px;line-height:1.5}
+footer a{color:inherit}
+.skel{opacity:.45}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>☀️ Sonne Langenlois</h1>
+      <div class="sub" id="stationInfo">Station wird gesucht …</div>
+    </div>
+    <button id="refresh" aria-label="Aktualisieren">↻</button>
+  </header>
+
+  <section class="card">
+    <div class="hero">
+      <div class="orb off" id="orb">⛅</div>
+      <div>
+        <div class="status skel" id="status">Lade Messwerte …</div>
+        <div class="statusSub" id="statusSub">&nbsp;</div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><b id="kToday">–</b><span>Sonne heute</span></div>
+      <div class="kpi"><b id="kHour">–</b><span>letzte Stunde</span></div>
+      <div class="kpi"><b id="kRad">–</b><span>Globalstrahlung</span></div>
+    </div>
+    <div class="err" id="errNow" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Heute gemessen</h2>
+    <div class="h2sub">Sonnenminuten je 10 Minuten · Station live</div>
+    <div id="chartToday"></div>
+  </section>
+
+  <section class="card">
+    <h2>Prognose nächste 24 Stunden</h2>
+    <div class="h2sub" id="fcSum">Sonnenminuten je Stunde</div>
+    <div id="chartFc"></div>
+    <div class="strip" id="strip" style="margin-top:12px"></div>
+    <div class="err" id="errFc" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Weitere Messwerte</h2>
+    <div class="h2sub" id="measTime">&nbsp;</div>
+    <div id="rows"></div>
+  </section>
+
+  <footer>
+    Messdaten: <a href="https://data.hub.geosphere.at/dataset/tawes-v1-10min" target="_blank" rel="noopener">GeoSphere Austria TAWES</a> (CC BY 4.0) ·
+    Prognose: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)<br>
+    <span id="updated"></span>
+  </footer>
+</main>
+
+<script>
+"use strict";
+// ---- Konfiguration ---------------------------------------------------------
+const CFG = {
+  match: "LANGENLOIS",            // Stationsname bei GeoSphere
+  lat: 48.4744, lon: 15.6797,     // Fallback-Koordinaten Langenlois
+  refreshMs: 5 * 60 * 1000
+};
+const GS = "https://dataset.api.hub.geosphere.at/v1/station";
+const DS = "tawes-v1-10min";
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const fmtT = d => d.toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"});
+const fmtH = m => m >= 60 ? `${Math.floor(m/60)} h ${String(Math.round(m%60)).padStart(2,"0")}` : `${Math.round(m)} min`;
+const num = (v,d=1) => (v==null||isNaN(v)) ? "–" : Number(v).toLocaleString("de-AT",{maximumFractionDigits:d,minimumFractionDigits:d});
+
+async function getJSON(url){
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+const norm = s => String(s||"").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const dist = (a,b,c,d) => Math.hypot(a-c,(b-d)*Math.cos(a*Math.PI/180));
+
+// ---- Station finden (einmal pro Woche gecacht) -----------------------------
+async function findStation(){
+  const override = new URLSearchParams(location.search).get("station");
+  const cached = store.get("station");
+  if(cached && !override && Date.now()-cached.ts < 7*864e5) return cached;
+
+  const meta = await getJSON(`${GS}/current/${DS}/metadata`);
+  const units = {};
+  (meta.parameters||[]).forEach(p => units[p.name] = p.unit);
+  const active = (meta.stations||[]).filter(s => s.is_active !== false);
+  let st = override ? active.find(s => String(s.id) === override) : null;
+  let exact = !!st;
+  if(!st){ st = active.find(s => norm(s.name).includes(CFG.match)); exact = !!st; }
+  if(!st){
+    // Fallback: nächstgelegene Station mit Sonnenscheinmessung
+    const cand = active.filter(s => s.has_sunshine !== false);
+    cand.sort((a,b)=>dist(a.lat,a.lon,CFG.lat,CFG.lon)-dist(b.lat,b.lon,CFG.lat,CFG.lon));
+    st = cand[0];
+  }
+  if(!st) throw new Error("Keine Station gefunden");
+  const s = {id:String(st.id), name:st.name, lat:st.lat, lon:st.lon, alt:st.altitude, exact, units, ts:Date.now()};
+  store.set("station", s);
+  return s;
+}
+
+// GeoJSON-Antwort -> {t:[Date], p:{NAME:[values]}}
+function parseGS(resp){
+  const f = resp.features && resp.features[0];
+  const p = {};
+  if(f && f.properties && f.properties.parameters){
+    for(const [k,v] of Object.entries(f.properties.parameters)) p[k] = {data:v.data||[], unit:v.unit};
+  }
+  return {t:(resp.timestamps||[]).map(x=>new Date(x)), p};
+}
+// Sonnenscheindauer (SO) in Minuten pro 10-min-Intervall
+function soToMin(v, unit){
+  if(v==null) return null;
+  if(unit && /^min/i.test(unit)) return v;
+  if(unit && /^s/i.test(unit)) return v/60;
+  return v > 10 ? v/60 : v; // Heuristik, falls keine Einheit geliefert wird
+}
+
+// ---- Messwerte -------------------------------------------------------------
+async function loadNow(st){
+  const params = "TL,RF,SO,GLOW,FF,FFX,RR,P";
+  const cur = parseGS(await getJSON(`${GS}/current/${DS}?parameters=${params}&station_ids=${st.id}`));
+
+  const midnight = new Date(); midnight.setHours(0,0,0,0);
+  const iso = d => d.toISOString().slice(0,16);
+  let hist = {t:[],p:{}};
+  try{
+    hist = parseGS(await getJSON(`${GS}/historical/${DS}?parameters=SO,GLOW&station_ids=${st.id}&start=${iso(midnight)}&end=${iso(new Date())}&output_format=geojson`));
+  }catch(e){ console.warn("Tagesverlauf nicht verfügbar", e); }
+
+  const soUnit = (cur.p.SO&&cur.p.SO.unit) || (hist.p.SO&&hist.p.SO.unit) || st.units.SO;
+  // Tagesreihe aufbauen (Map nach Zeitstempel, aktueller Wert ergänzt fehlende Spitze)
+  const series = new Map();
+  hist.t.forEach((t,i)=>{
+    const so = hist.p.SO ? soToMin(hist.p.SO.data[i], soUnit) : null;
+    series.set(+t, {t, so, glow: hist.p.GLOW ? hist.p.GLOW.data[i] : null});
+  });
+  cur.t.forEach((t,i)=>{
+    if(t >= midnight) series.set(+t, {t, so: cur.p.SO ? soToMin(cur.p.SO.data[i], soUnit) : null, glow: cur.p.GLOW ? cur.p.GLOW.data[i] : null});
+  });
+  const today = [...series.values()].sort((a,b)=>a.t-b.t);
+  const last = i => (cur.p[i] && cur.p[i].data.length) ? cur.p[i].data[cur.p[i].data.length-1] : null;
+  return {
+    time: cur.t[cur.t.length-1],
+    so10: soToMin(last("SO"), soUnit),
+    glow: last("GLOW"), tl: last("TL"), rf: last("RF"),
+    ff: last("FF"), ffx: last("FFX"), rr: last("RR"), p: last("P"),
+    units: Object.fromEntries(Object.entries(cur.p).map(([k,v])=>[k,v.unit||st.units[k]||""])),
+    today
+  };
+}
+
+// ---- Prognose (Open-Meteo, Stundenwerte) -----------------------------------
+async function loadForecast(lat, lon){
+  const u = new URL("https://api.open-meteo.com/v1/forecast");
+  u.search = new URLSearchParams({
+    latitude: lat, longitude: lon,
+    hourly: "sunshine_duration,cloud_cover,temperature_2m,precipitation_probability,shortwave_radiation,is_day",
+    daily: "sunrise,sunset,sunshine_duration",
+    timezone: "Europe/Vienna", timeformat: "unixtime", forecast_days: 3
+  });
+  const d = await getJSON(u);
+  const h = d.hourly, now = Date.now(), start = now - (now % 36e5);
+  const hours = h.time.map((t,i)=>({
+    t:new Date(t*1000), sun:(h.sunshine_duration[i]||0)/60, cc:h.cloud_cover[i],
+    temp:h.temperature_2m[i], pp:h.precipitation_probability ? h.precipitation_probability[i] : null,
+    rad:h.shortwave_radiation[i], day:h.is_day[i]
+  })).filter(x => +x.t >= start).slice(0,24);
+  const dl = d.daily;
+  return {hours, sunrise:new Date(dl.sunrise[0]*1000), sunset:new Date(dl.sunset[0]*1000),
+          sunriseTomorrow:new Date(dl.sunrise[1]*1000), dayTotals:dl.sunshine_duration.map(s=>s/60)};
+}
+
+// ---- Darstellung -----------------------------------------------------------
+function barChart({bars, max, labels, marker, color, height=110}){
+  const W = 600, H = height, top = 6, bottom = 18, n = bars.length || 1;
+  const bw = W / n, ih = H - top - bottom;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  [0.5,1].forEach(f=>{ const y = top + ih*(1-f); s += `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="3 4"/>`; });
+  bars.forEach((b,i)=>{
+    if(b.v == null) return;
+    const h = Math.max(b.v>0?2:0, ih*Math.min(b.v,max)/max);
+    s += `<rect x="${i*bw+bw*0.12}" y="${top+ih-h}" width="${bw*0.76}" height="${h}" rx="${Math.min(3,bw*0.3)}" fill="${b.c||color}"><title>${b.tip||""}</title></rect>`;
+  });
+  s += `<line x1="0" x2="${W}" y1="${top+ih}" y2="${top+ih}" stroke="var(--line)"/>`;
+  labels.forEach(l => s += `<text x="${l.x*bw}" y="${H-4}" text-anchor="middle">${l.t}</text>`);
+  if(marker!=null) s += `<line x1="${marker*bw}" x2="${marker*bw}" y1="${top}" y2="${top+ih}" stroke="var(--ink)" stroke-width="1.5" opacity=".5"/>`;
+  return s + `</svg>`;
+}
+
+function renderNow(st, m, fc){
+  const night = fc ? (new Date() < fc.sunrise || new Date() > fc.sunset) : (m.glow!=null && m.glow < 5);
+  const sunOn = m.so10 != null && m.so10 > 0.1;
+  const orb = $("orb");
+  orb.className = "orb " + (sunOn ? "on" : night ? "night" : "off");
+  orb.textContent = sunOn ? "☀️" : night ? "🌙" : "☁️";
+  const status = $("status"); status.classList.remove("skel");
+  if(sunOn) status.textContent = m.so10 >= 9.5 ? "Die Sonne scheint" : "Teilweise sonnig";
+  else status.textContent = night ? "Nacht" : "Keine Sonne";
+  $("statusSub").textContent = m.so10!=null
+    ? `${num(m.so10,1)} von 10 Min. Sonne · Messung ${fmtT(m.time)}`
+    : `Messung ${m.time?fmtT(m.time):"–"}`;
+
+  const total = m.today.reduce((a,x)=>a+(x.so||0),0);
+  const hourAgo = Date.now()-36e5;
+  const lastHour = m.today.filter(x=>+x.t>hourAgo).reduce((a,x)=>a+(x.so||0),0);
+  $("kToday").textContent = fmtH(total);
+  $("kHour").textContent = `${Math.round(lastHour)} min`;
+  $("kRad").textContent = m.glow!=null ? `${Math.round(m.glow)} W/m²` : "–";
+
+  // Tageschart: 144 Slots à 10 min
+  const mid = new Date(); mid.setHours(0,0,0,0);
+  const slots = Array.from({length:144},()=>({v:null}));
+  m.today.forEach(x=>{
+    const i = Math.floor((x.t - mid)/6e5) - 1; // Zeitstempel = Intervallende
+    if(i>=0 && i<144) slots[Math.max(0,i)] = {v:x.so, tip:`${fmtT(x.t)}: ${num(x.so,1)} min`};
+  });
+  const nowIdx = (Date.now()-mid)/6e5;
+  $("chartToday").innerHTML = barChart({
+    bars:slots, max:10, color:"var(--sun)", marker:nowIdx,
+    labels:[0,3,6,9,12,15,18,21,24].map(h=>({x:h*6,t:h===24?"":String(h).padStart(2,"0")}))
+  });
+
+  $("measTime").textContent = `Station ${st.name} · ${m.time?m.time.toLocaleString("de-AT",{dateStyle:"short",timeStyle:"short"}):""}`;
+  const rows = [
+    ["Temperatur", m.tl!=null?`${num(m.tl)} °C`:"–"],
+    ["Rel. Luftfeuchte", m.rf!=null?`${Math.round(m.rf)} %`:"–"],
+    ["Wind (Mittel / Böe)", m.ff!=null?`${num(m.ff*3.6,0)} / ${m.ffx!=null?num(m.ffx*3.6,0):"–"} km/h`:"–"],
+    ["Niederschlag (10 min)", m.rr!=null?`${num(m.rr)} mm`:"–"],
+    ["Luftdruck", m.p!=null?`${num(m.p)} hPa`:"–"],
+    fc ? ["Sonnenaufgang / -untergang", `${fmtT(fc.sunrise)} / ${fmtT(fc.sunset)}`] : null
+  ].filter(Boolean);
+  $("rows").innerHTML = rows.map(r=>`<div class="row"><span>${r[0]}</span><span>${r[1]}</span></div>`).join("");
+}
+
+function icon(h){
+  if(!h.day) return "🌙";
+  const f = h.sun/60;
+  if(h.pp!=null && h.pp>=60) return "🌧️";
+  return f>0.75?"☀️":f>0.4?"🌤️":f>0.1?"⛅":"☁️";
+}
+function renderForecast(fc){
+  const sum = fc.hours.reduce((a,h)=>a+h.sun,0);
+  const next = fc.hours.find(h=>h.sun>=5 && +h.t > Date.now());
+  $("fcSum").textContent = `Summe ${fmtH(sum)} Sonne` + (next ? ` · nächste Sonne ab ca. ${fmtT(next.t)}` : " · keine Sonne erwartet");
+  $("chartFc").innerHTML = barChart({
+    bars: fc.hours.map(h=>({v:h.sun, c:h.day?"var(--fc)":"var(--night)", tip:`${fmtT(h.t)}: ${Math.round(h.sun)} min, ${h.cc}% Bewölkung`})),
+    max:60,
+    labels: fc.hours.map((h,i)=>({h,i})).filter(o=>o.h.t.getHours()%3===0).map(o=>({x:o.i+0.5,t:String(o.h.t.getHours()).padStart(2,"0")}))
+  });
+  $("strip").innerHTML = fc.hours.map(h=>`
+    <div class="hr">
+      <div class="t">${String(h.t.getHours()).padStart(2,"0")}:00</div>
+      <div class="i">${icon(h)}</div>
+      <div class="m">${Math.round(h.sun)}′</div>
+      <div class="c">${Math.round(h.temp)}° · ${h.cc}%☁</div>
+    </div>`).join("");
+}
+
+function showErr(id, e){ const el=$(id); el.hidden=false; el.textContent = "Fehler: " + (e && e.message || e); }
+function hideErr(id){ $(id).hidden = true; }
+
+let busy = false;
+async function refresh(){
+  if(busy) return; busy = true; $("refresh").textContent = "…";
+  try{
+    let st;
+    try{
+      st = await findStation();
+      $("stationInfo").textContent = `${st.name}${st.alt?` · ${Math.round(st.alt)} m`:""} · ID ${st.id}${st.exact?"":" (nächstgelegen)"}`;
+    }catch(e){ showErr("errNow", e); }
+
+    const [m, fc] = await Promise.allSettled([
+      st ? loadNow(st) : Promise.reject(new Error("Station unbekannt")),
+      loadForecast(st?st.lat:CFG.lat, st?st.lon:CFG.lon)
+    ]);
+    if(fc.status==="fulfilled"){ renderForecast(fc.value); hideErr("errFc"); } else showErr("errFc", fc.reason);
+    if(m.status==="fulfilled"){ renderNow(st, m.value, fc.value); hideErr("errNow"); } else showErr("errNow", m.reason);
+    $("updated").textContent = `Aktualisiert ${fmtT(new Date())} · automatisch alle 5 Min.`;
+  } finally { busy = false; $("refresh").textContent = "↻"; }
+}
+
+$("refresh").addEventListener("click", refresh);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refresh(); });
+setInterval(()=>{ if(!document.hidden) refresh(); }, CFG.refreshMs);
+refresh();
+
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
