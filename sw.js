@@ -1,5 +1,5 @@
-// Service Worker: App-Shell offline, API-Daten network-first mit Cache-Fallback
-const CACHE = "sonne-langenlois-v1";
+// Service Worker: immer zuerst Netz (neue Versionen sofort), offline letzter Stand aus dem Cache
+const CACHE = "wetterstation-langenlois-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -17,27 +17,10 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
-  const url = new URL(req.url);
-
-  if (url.origin === location.origin) {
-    // App-Shell: Cache zuerst, im Hintergrund aktualisieren
-    e.respondWith(
-      caches.match(req).then(hit => {
-        const net = fetch(req).then(res => {
-          if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone()));
-          return res;
-        }).catch(() => hit);
-        return hit || net;
-      })
-    );
-    return;
-  }
-
-  // Wetter-APIs: immer frisch, offline letzter Stand
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: "no-store" }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
-    }).catch(() => caches.match(req))
+    }).catch(() => caches.match(req, { ignoreSearch: new URL(req.url).origin === location.origin }))
   );
 });
