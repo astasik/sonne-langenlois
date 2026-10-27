@@ -115,7 +115,7 @@ footer a{color:inherit}
   </header>
 
   <div class="banner" id="cfgBanner" hidden>
-    Deine Anlage (13,12 kWp, Ost/West, 30°) ist hinterlegt. Bitte unter <b>Anlage einstellen</b> noch die nutzbare <b>Speichergröße</b> prüfen und speichern. Angenommen sind derzeit 10 kWh.
+    Bitte unter <b>Anlage einstellen</b> die Speicherdaten prüfen und speichern.
   </div>
 
   <!-- JETZT -->
@@ -216,10 +216,10 @@ footer a{color:inherit}
         <label>Neigung (°)<input id="c_tilt2" type="number" step="1" min="0" max="90" inputmode="numeric"></label>
         <label>&nbsp;</label>
         <h3>Speicher</h3>
-        <label>Nutzbare Kapazität (kWh)<input id="c_bat" type="number" step="0.1" min="0" inputmode="decimal"></label>
-        <label>Auto-Verschiebung nur bis (%)<input id="c_autoSoc" type="number" step="5" min="0" max="90" inputmode="numeric"></label>
-        <label>Notreserve (%)<input id="c_minSoc" type="number" step="5" min="0" max="50" inputmode="numeric"></label>
-        <label>&nbsp;</label>
+        <label>Kapazität gesamt (kWh)<input id="c_bat" type="number" step="0.1" min="0" inputmode="decimal"></label>
+        <label>Auto-Verschiebung nur bis (%)<input id="c_autoSoc" type="number" step="0.5" min="0" max="90" inputmode="numeric"></label>
+        <label>Notreserve (%)<input id="c_minSoc" type="number" step="0.5" min="0" max="50" inputmode="numeric"></label>
+        <label id="batInfo" style="justify-content:flex-end">&nbsp;</label>
         <h3>Haus</h3>
         <label>Grundlast (W)<input id="c_base" type="number" step="50" min="0" inputmode="numeric"></label>
         <label>Großer Verbraucher ab (kW)<input id="c_big" type="number" step="0.5" min="0" inputmode="decimal"></label>
@@ -241,7 +241,7 @@ footer a{color:inherit}
         <li><b>Die Prognose</b> stammt aus Wettermodellen (Open-Meteo, u. a. DWD ICON) für den Standort der Station, getrennt gerechnet für dein Ost- und Westfeld. Eine Station kann selbst nicht vorhersagen.</li>
         <li><b>Stations-Korrektur:</b> Die App vergleicht die gemessene Strahlung der letzten Stunden mit der Prognose. Liegt die Station z. B. 20 % darunter, werden die nächsten Stunden entsprechend angepasst. Die Korrektur klingt nach etwa 3 Stunden ab.</li>
         <li><b>PV-Leistung</b> = Strahlung auf Modulebene × kWp × Systemwirkungsgrad. „PV jetzt“ und die schwarze Linie im Diagramm rechnen die gemessene Strahlung der Station auf deine Module um.</li>
-        <li><b>Speicher → Auto:</b> Die App simuliert deinen Akku Stunde für Stunde bis übermorgen früh: PV-Prognose minus Sicherheitsabschlag, Grundlast konstant. Empfohlen wird die größte Menge, bei der der Akku nie unter die Auto-Grenze (20 %) fällt. Die Notreserve (10 %) bleibt für den Notfall, darunter käme Strom aus dem Netz.</li>
+        <li><b>Speicher → Auto:</b> Die App simuliert deinen Akku Stunde für Stunde bis übermorgen früh: PV-Prognose minus Sicherheitsabschlag, Grundlast konstant. Empfohlen wird die größte Menge, bei der der Akku nicht unter die Auto-Grenze fällt (regulär 32 von 40 kWh nutzbar). Die Notreserve bis 35 kWh wird nur im Notfall angetastet, darunter käme Strom aus dem Netz. Der Akkustand im Regler ist der Prozentwert, den der Wechselrichter anzeigt (bezogen auf 40 kWh).</li>
       </ul>
     </details>
   </section>
@@ -258,7 +258,8 @@ footer a{color:inherit}
 // ---- Konfiguration ---------------------------------------------------------
 const CFG = { match:"LANGENLOIS", lat:48.4744, lon:15.6797, refreshMs:5*60*1000 };
 // Anlage Andreas: 32 × 410 Wp = 13,12 kWp; 20 Module Ost (8,2 kWp), 12 Module West (4,92 kWp), 30°
-const DEF = { v:2, kwp1:8.2, az1:-90, tilt1:30, kwp2:4.92, az2:90, tilt2:30, bat:10, autoSoc:20, minSoc:10, base:650, big:2, pr:85, safety:15 };
+// Speicher 40 kWh brutto: regulär 32 kWh nutzbar (Auto-Grenze 20 % = 8 kWh), im Notfall 35 kWh (Notreserve 12,5 % = 5 kWh)
+const DEF = { v:3, kwp1:8.2, az1:-90, tilt1:30, kwp2:4.92, az2:90, tilt2:30, bat:40, autoSoc:20, minSoc:12.5, base:650, big:2, pr:85, safety:15, batConfirmed:true };
 const AZ = [["Ost",-90],["Südost",-45],["Süd",0],["Südwest",45],["West",90],["Nord",180]];
 const GS = "https://dataset.api.hub.geosphere.at/v1/station";
 const DS = "tawes-v1-10min";
@@ -271,9 +272,10 @@ function loadCfg(){
   const s = store.get("cfg");
   if(!s) return Object.assign({}, DEF);
   if(s.v !== DEF.v){
-    // Umstieg auf Version 2: neue Anlagendaten übernehmen, eigene Speicher-/Feineinstellungen behalten
-    const keep = {}; ["bat","big","pr","safety"].forEach(k => { if(s[k] != null) keep[k] = s[k]; });
-    const c = Object.assign({}, DEF, keep, {batConfirmed: s.bat != null && s.bat !== 10});
+    // Umstieg auf Version 3: neue Speicherdaten übernehmen, übrige eigene Einstellungen behalten
+    const keep = {}; ["big","pr","safety"].forEach(k => { if(s[k] != null) keep[k] = s[k]; });
+    if(s.v === 2) ["kwp1","az1","tilt1","kwp2","az2","tilt2","base"].forEach(k => { if(s[k] != null) keep[k] = s[k]; });
+    const c = Object.assign({}, DEF, keep);
     store.set("cfg", c);
     return c;
   }
@@ -705,7 +707,7 @@ function renderPlan(md){
   $("soc").value = soc;
   const E0 = cfg.bat * soc/100;
   $("socOut").textContent = `${soc} % · ${kWh(E0)}`;
-  $("planSub").textContent = `Wie viel kann jetzt ins Auto, ohne dass der Akku bis übermorgen früh unter ${cfg.autoSoc} % fällt? (Notreserve ${cfg.minSoc} %)`;
+  $("planSub").textContent = `Wie viel kann jetzt ins Auto, ohne dass der Akku bis übermorgen früh unter ${num(cfg.autoSoc,0)} % (${kWh(cfg.bat*cfg.autoSoc/100)}) fällt? Notreserve ${num(cfg.minSoc, cfg.minSoc%1?1:0)} % (${kWh(cfg.bat*cfg.minSoc/100)}).`;
   const el = $("advicePlan");
   if(!md){ advice(el, "", "Warte auf Prognose …", ""); return; }
   const r = maxShift(E0, md), s0 = r.s0;
@@ -716,7 +718,7 @@ function renderPlan(md){
   $("pvExport").textContent = kWh(after.expEve);
   const res = cfg.bat*cfg.autoSoc/100;
   const nightWarn = s0.imp > 0.05
-    ? ` Achtung: Auch ohne Auto erreicht der Akku ${when(s0.lowT)} die Notreserve (${cfg.minSoc} %), danach ca. ${kWh(s0.imp)} Netzbezug.`
+    ? ` Achtung: Auch ohne Auto erreicht der Akku ${when(s0.lowT)} die Notreserve (${num(cfg.minSoc, cfg.minSoc%1?1:0)} %), danach ca. ${kWh(s0.imp)} Netzbezug.`
     : s0.low < res ? ` Hinweis: Auch ohne Auto sinkt der Akku ${when(s0.lowT)} auf ca. ${pct(s0.low)}.` : "";
   const exportTxt = after.expEve > 1 ? ` Bis morgen Abend gehen trotzdem noch ca. ${kWh(after.expEve)} ins Netz: Auto zusätzlich tagsüber direkt mit PV laden.` : "";
   if(E0 <= res + 0.05){
@@ -727,7 +729,7 @@ function renderPlan(md){
       : `Die PV füllt den Akku danach wieder auf, die Nacht wird dadurch nicht knapper.${nightWarn}`;
     advice(el, "good", `Bis zu ${kWh(r.x)} ins Auto`, why + exportTxt);
   } else if(s0.imp > 0.05){
-    advice(el, "bad", "Speicher halten: Netzbezug droht", `Schon ohne Auto-Laden erreicht der Akku ${when(s0.lowT)} die Notreserve von ${cfg.minSoc} %; danach ca. ${kWh(s0.imp)} aus dem Netz. Große Verbraucher vermeiden.`);
+    advice(el, "bad", "Speicher halten: Netzbezug droht", `Schon ohne Auto-Laden erreicht der Akku ${when(s0.lowT)} die Notreserve von ${num(cfg.minSoc, cfg.minSoc%1?1:0)} %; danach ca. ${kWh(s0.imp)} aus dem Netz. Große Verbraucher vermeiden.`);
   } else if(s0.low < res){
     advice(el, "bad", "Speicher halten", `Schon ohne Auto-Laden sinkt der Akku ${when(s0.lowT)} auf ca. ${pct(s0.low)}, also unter deine Grenze von ${cfg.autoSoc} %.`);
   } else if(r.x >= 0.5){
@@ -791,12 +793,13 @@ const FIELDS = ["kwp1","az1","tilt1","kwp2","az2","tilt2","bat","autoSoc","minSo
 function fillForm(){
   ["c_az1","c_az2"].forEach(id=>{ $(id).innerHTML = AZ.map(([n,v])=>`<option value="${v}">${n}</option>`).join(""); });
   FIELDS.forEach(k => { $("c_"+k).value = cfg[k]; });
+  $("batInfo").textContent = `regulär ${kWh(cfg.bat*(1-cfg.autoSoc/100))}, im Notfall ${kWh(cfg.bat*(1-cfg.minSoc/100))} nutzbar`;
 }
 $("cfgSave").addEventListener("click", ()=>{
   const n = {v:DEF.v, batConfirmed:true};
   FIELDS.forEach(k => { const v = parseFloat(String($("c_"+k).value).replace(",", ".")); n[k] = isNaN(v) ? DEF[k] : v; });
   if(n.minSoc > n.autoSoc) n.minSoc = n.autoSoc;
-  cfg = n; store.set("cfg", cfg);
+  cfg = n; store.set("cfg", cfg); fillForm();
   $("cfgDetails").open = false;
   refresh();
 });

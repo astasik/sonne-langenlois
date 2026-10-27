@@ -1,5 +1,5 @@
 // Service Worker: immer zuerst Netz (neue Versionen sofort), offline letzter Stand aus dem Cache
-const CACHE = "wetterstation-langenlois-v3";
+const CACHE = "wetterstation-langenlois-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
