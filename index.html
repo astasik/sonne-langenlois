@@ -15,12 +15,12 @@
 :root{
   --bg:#f6f2ea;--card:#fffdf8;--ink:#1d1a15;--mute:#6f675b;--line:#e6dfd2;--soft:#efe9dd;
   --sun:#f2a516;--sun2:#ffd36b;--cloud:#a3abb4;--night:#5b6478;
-  --good:#2f9e5b;--mid:#d48a0b;--bad:#c2452d;
+  --good:#2f9e5b;--mid:#d48a0b;--bad:#c2452d;--now:#2563c9;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#14110c;--card:#1e1a14;--ink:#f3ede2;--mute:#a79e8f;--line:#332d24;--soft:#29241c;
   --sun:#ffb627;--sun2:#ffd877;--cloud:#5f6873;--night:#8590a8;
-  --good:#4cc47e;--mid:#f0a830;--bad:#ff7a5c;
+  --good:#4cc47e;--mid:#f0a830;--bad:#ff7a5c;--now:#5b9bff;
 }}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
@@ -51,7 +51,16 @@ h2{font-size:1rem;margin:0 0 2px}
 .dot.good{background:var(--good)}.dot.mid{background:var(--mid)}.dot.bad{background:var(--bad)}
 .advice b{display:block}
 .advice span{color:var(--mute);font-size:.85rem}
-.big{font-size:2rem;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.sums{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.sum{background:var(--soft);border-radius:12px;padding:10px 12px}
+.sum span{color:var(--mute);font-size:.75rem;display:block}
+.sum b{display:block;font-size:1.6rem;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
+.sum small{color:var(--mute);font-size:.72rem;display:block;margin-top:2px;line-height:1.3}
+.fcWrap{display:flex;align-items:stretch}
+.fcAxis{flex:0 0 auto}
+.fcScroll{flex:1;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.fcScroll svg{display:block;max-width:none}
+.hint{font-size:.72rem;color:var(--mute);text-align:right;margin-top:2px}
 .socRow{display:flex;align-items:center;gap:12px;margin:4px 0 12px}
 .socRow label{font-size:.85rem;color:var(--mute);white-space:nowrap}
 .socRow output{font-variant-numeric:tabular-nums;font-weight:600;min-width:9.5em;text-align:right;font-size:.9rem}
@@ -106,7 +115,7 @@ footer a{color:inherit}
   </header>
 
   <div class="banner" id="cfgBanner" hidden>
-    Es laufen noch Standardwerte (10 kWp Süd, 10 kWh Speicher, 500 W Grundlast). Trag unten bei <b>Anlage einstellen</b> deine Daten ein, damit die Empfehlungen stimmen.
+    Deine Anlage (13,12 kWp, Ost/West, 30°) ist hinterlegt. Bitte unter <b>Anlage einstellen</b> noch die nutzbare <b>Speichergröße</b> prüfen und speichern. Angenommen sind derzeit 10 kWh.
   </div>
 
   <!-- JETZT -->
@@ -127,10 +136,38 @@ footer a{color:inherit}
     <div class="err" id="errNow" hidden></div>
   </section>
 
+  <!-- PROGNOSE -->
+  <section class="card">
+    <h2>PV-Prognose heute &amp; morgen</h2>
+    <div class="h2sub" id="fcSub">Erwartete Leistung deiner Anlage je Stunde</div>
+    <div class="sums">
+      <div class="sum"><span id="sumTodayL">Heute prognostiziert</span><b id="sumToday">–</b><small id="sumTodaySub">&nbsp;</small></div>
+      <div class="sum"><span id="sumTomL">Morgen prognostiziert</span><b id="sumTom">–</b><small id="sumTomSub">&nbsp;</small></div>
+    </div>
+    <div class="fcWrap">
+      <div class="fcAxis" id="fcAxis"></div>
+      <div class="fcScroll" id="fcScroll"><div id="chartFc"></div></div>
+    </div>
+    <div class="hint">← seitlich wischen für heute früh und morgen →</div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>Überschuss ≥ <span id="lgBig">2</span> kW</span>
+      <span><i style="background:var(--sun)"></i>deckt Grundlast</span>
+      <span><i style="background:var(--cloud)"></i>unter Grundlast</span>
+      <span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;opacity:.7"></i>Grundlast <span id="lgBase">0,7</span> kW</span>
+      <span><i style="background:var(--ink);height:3px"></i>bisher laut Station</span>
+      <span><i style="background:var(--now);width:3px;height:12px"></i>jetzt</span>
+    </div>
+    <div style="margin-top:14px"><b style="font-size:.9rem">Beste Zeitfenster für große Verbraucher (nächste 24 h)</b></div>
+    <div id="windows" style="margin-top:4px"></div>
+    <div class="strip" id="strip"></div>
+    <div class="note" id="corrNote"></div>
+    <div class="err" id="errFc" hidden></div>
+  </section>
+
   <!-- SPEICHER -> AUTO -->
   <section class="card">
     <h2>Speicher → Auto</h2>
-    <div class="h2sub">Wie viel kann jetzt ins Auto, ohne dass bis übermorgen früh Netzbezug entsteht?</div>
+    <div class="h2sub" id="planSub">Wie viel kann jetzt ins Auto, ohne dass der Akku bis übermorgen früh unter 20 % fällt?</div>
     <div class="socRow">
       <label for="soc">Akku jetzt</label>
       <input type="range" id="soc" min="0" max="100" step="5" value="80">
@@ -138,28 +175,10 @@ footer a{color:inherit}
     </div>
     <div class="advice" id="advicePlan"><div class="dot"></div><div><b>Warte auf Prognose …</b></div></div>
     <div class="mini">
-      <div>PV Rest heute<b id="pvRest">–</b></div>
-      <div>PV morgen<b id="pvTomorrow">–</b></div>
+      <div>Akku danach<b id="socAfter">–</b></div>
+      <div>Tiefster Stand<b id="socLow">–</b></div>
       <div>Einspeisung bis morgen Abend<b id="pvExport">–</b></div>
     </div>
-  </section>
-
-  <!-- PROGNOSE -->
-  <section class="card">
-    <h2>PV-Prognose nächste 24 Stunden</h2>
-    <div class="h2sub" id="fcSub">Erwartete PV-Leistung deiner Anlage je Stunde</div>
-    <div id="chartFc"></div>
-    <div class="legend">
-      <span><i style="background:var(--good)"></i>Überschuss ≥ <span id="lgBig">2</span> kW</span>
-      <span><i style="background:var(--sun)"></i>deckt Grundlast</span>
-      <span><i style="background:var(--cloud)"></i>unter Grundlast</span>
-      <span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0;opacity:.7"></i>Grundlast <span id="lgBase">0,5</span> kW</span>
-    </div>
-    <div style="margin-top:14px"><b style="font-size:.9rem">Beste Zeitfenster für große Verbraucher</b></div>
-    <div id="windows" style="margin-top:4px"></div>
-    <div class="strip" id="strip"></div>
-    <div class="note" id="corrNote"></div>
-    <div class="err" id="errFc" hidden></div>
   </section>
 
   <!-- HEUTE GEMESSEN -->
@@ -187,21 +206,25 @@ footer a{color:inherit}
       <summary>Anlage einstellen</summary>
       <div class="form">
         <h3>PV-Feld 1</h3>
-        <label>Leistung (kWp)<input id="c_kwp1" type="number" step="0.1" min="0" inputmode="decimal"></label>
+        <label>Leistung (kWp)<input id="c_kwp1" type="number" step="0.01" min="0" inputmode="decimal"></label>
         <label>Ausrichtung<select id="c_az1"></select></label>
         <label>Neigung (°)<input id="c_tilt1" type="number" step="1" min="0" max="90" inputmode="numeric"></label>
         <label>&nbsp;</label>
-        <h3>PV-Feld 2 (optional, z. B. Ost/West)</h3>
-        <label>Leistung (kWp, 0 = keins)<input id="c_kwp2" type="number" step="0.1" min="0" inputmode="decimal"></label>
+        <h3>PV-Feld 2 (0 kWp = keins)</h3>
+        <label>Leistung (kWp)<input id="c_kwp2" type="number" step="0.01" min="0" inputmode="decimal"></label>
         <label>Ausrichtung<select id="c_az2"></select></label>
         <label>Neigung (°)<input id="c_tilt2" type="number" step="1" min="0" max="90" inputmode="numeric"></label>
         <label>&nbsp;</label>
-        <h3>Haus &amp; Speicher</h3>
-        <label>Speicher nutzbar (kWh)<input id="c_bat" type="number" step="0.1" min="0" inputmode="decimal"></label>
-        <label>Grundlast Haus (W)<input id="c_base" type="number" step="50" min="0" inputmode="numeric"></label>
+        <h3>Speicher</h3>
+        <label>Nutzbare Kapazität (kWh)<input id="c_bat" type="number" step="0.1" min="0" inputmode="decimal"></label>
+        <label>Auto-Verschiebung nur bis (%)<input id="c_autoSoc" type="number" step="5" min="0" max="90" inputmode="numeric"></label>
+        <label>Notreserve (%)<input id="c_minSoc" type="number" step="5" min="0" max="50" inputmode="numeric"></label>
+        <label>&nbsp;</label>
+        <h3>Haus</h3>
+        <label>Grundlast (W)<input id="c_base" type="number" step="50" min="0" inputmode="numeric"></label>
         <label>Großer Verbraucher ab (kW)<input id="c_big" type="number" step="0.5" min="0" inputmode="decimal"></label>
         <label>Systemwirkungsgrad (%)<input id="c_pr" type="number" step="1" min="50" max="100" inputmode="numeric"></label>
-        <label class="full">Sicherheitsabschlag auf die PV-Prognose (%)<input id="c_safety" type="number" step="5" min="0" max="60" inputmode="numeric"></label>
+        <label>Sicherheitsabschlag Prognose (%)<input id="c_safety" type="number" step="5" min="0" max="60" inputmode="numeric"></label>
         <div class="full" style="display:flex;gap:8px;justify-content:flex-end">
           <button id="cfgReset">Standard</button>
           <button id="cfgSave" class="primary">Speichern</button>
@@ -215,10 +238,10 @@ footer a{color:inherit}
       <summary>So rechnet die App</summary>
       <ul class="explain">
         <li><b>Messwerte</b> kommen live von der Wetterstation Langenlois (GeoSphere Austria, alle 10 Minuten).</li>
-        <li><b>Die Prognose</b> stammt aus Wettermodellen (Open-Meteo, u. a. DWD ICON) für den Standort der Station. Eine Station kann selbst nicht vorhersagen.</li>
+        <li><b>Die Prognose</b> stammt aus Wettermodellen (Open-Meteo, u. a. DWD ICON) für den Standort der Station, getrennt gerechnet für dein Ost- und Westfeld. Eine Station kann selbst nicht vorhersagen.</li>
         <li><b>Stations-Korrektur:</b> Die App vergleicht die gemessene Strahlung der letzten Stunden mit der Prognose. Liegt die Station z. B. 20 % darunter, werden die nächsten Stunden entsprechend angepasst. Die Korrektur klingt nach etwa 3 Stunden ab.</li>
-        <li><b>PV-Leistung</b> = Strahlung auf Modulebene × kWp × Systemwirkungsgrad. „PV jetzt“ rechnet die gemessene Strahlung der Station auf deine Modulneigung um.</li>
-        <li><b>Speicher → Auto:</b> Die App simuliert deinen Akku Stunde für Stunde bis übermorgen früh: PV-Prognose minus Sicherheitsabschlag, Grundlast konstant. Angezeigt wird die größte Menge, die du entnehmen kannst, ohne dass der Akku vorher leer läuft.</li>
+        <li><b>PV-Leistung</b> = Strahlung auf Modulebene × kWp × Systemwirkungsgrad. „PV jetzt“ und die schwarze Linie im Diagramm rechnen die gemessene Strahlung der Station auf deine Module um.</li>
+        <li><b>Speicher → Auto:</b> Die App simuliert deinen Akku Stunde für Stunde bis übermorgen früh: PV-Prognose minus Sicherheitsabschlag, Grundlast konstant. Empfohlen wird die größte Menge, bei der der Akku nie unter die Auto-Grenze (20 %) fällt. Die Notreserve (10 %) bleibt für den Notfall, darunter käme Strom aus dem Netz.</li>
       </ul>
     </details>
   </section>
@@ -234,8 +257,9 @@ footer a{color:inherit}
 "use strict";
 // ---- Konfiguration ---------------------------------------------------------
 const CFG = { match:"LANGENLOIS", lat:48.4744, lon:15.6797, refreshMs:5*60*1000 };
-const DEF = { kwp1:10, az1:0, tilt1:30, kwp2:0, az2:0, tilt2:30, bat:10, base:500, big:2, pr:85, safety:15 };
-const AZ = [["Süd",0],["Südsüdost",-22],["Südost",-45],["Ost",-90],["Südsüdwest",22],["Südwest",45],["West",90],["Nord",180]];
+// Anlage Andreas: 32 × 410 Wp = 13,12 kWp; 20 Module Ost (8,2 kWp), 12 Module West (4,92 kWp), 30°
+const DEF = { v:2, kwp1:8.2, az1:-90, tilt1:30, kwp2:4.92, az2:90, tilt2:30, bat:10, autoSoc:20, minSoc:10, base:650, big:2, pr:85, safety:15 };
+const AZ = [["Ost",-90],["Südost",-45],["Süd",0],["Südwest",45],["West",90],["Nord",180]];
 const GS = "https://dataset.api.hub.geosphere.at/v1/station";
 const DS = "tawes-v1-10min";
 const $ = id => document.getElementById(id);
@@ -243,9 +267,21 @@ const store = {
   get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
-let cfg = Object.assign({}, DEF, store.get("cfg") || {});
+function loadCfg(){
+  const s = store.get("cfg");
+  if(!s) return Object.assign({}, DEF);
+  if(s.v !== DEF.v){
+    // Umstieg auf Version 2: neue Anlagendaten übernehmen, eigene Speicher-/Feineinstellungen behalten
+    const keep = {}; ["bat","big","pr","safety"].forEach(k => { if(s[k] != null) keep[k] = s[k]; });
+    const c = Object.assign({}, DEF, keep, {batConfirmed: s.bat != null && s.bat !== 10});
+    store.set("cfg", c);
+    return c;
+  }
+  return Object.assign({}, DEF, s);
+}
+let cfg = loadCfg();
 let soc = store.get("soc"); if(soc == null) soc = 80;
-const state = { st:null, meas:null, fc:null };
+const state = { st:null, meas:null, fc:null, fcScrolled:false };
 
 const fmtT = d => d.toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"});
 const hh = d => String(d.getHours()).padStart(2,"0");
@@ -253,8 +289,16 @@ const fmtH = m => m >= 60 ? `${Math.floor(m/60)} h ${String(Math.round(m%60)).pa
 const num = (v,d=1) => (v==null||isNaN(v)) ? "–" : Number(v).toLocaleString("de-AT",{maximumFractionDigits:d,minimumFractionDigits:d});
 const kW = v => `${num(v, v<10?1:0)} kW`;
 const kWh = v => `${num(v, v<10?1:0)} kWh`;
+const pct = e => `${Math.round(100*e/cfg.bat)} %`;
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 const midnight = (d=new Date(), add=0) => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()+add); return x; };
+const kwpTot = () => cfg.kwp1 + (cfg.kwp2 > 0 ? cfg.kwp2 : 0);
+const wd = d => d.toLocaleDateString("de-AT",{weekday:"short", day:"2-digit", month:"2-digit"});
+function when(d){
+  const diff = Math.round((+midnight(d) - +midnight())/864e5);
+  const day = diff === 0 ? "heute" : diff === 1 ? "morgen" : diff === 2 ? "übermorgen" : d.toLocaleDateString("de-AT",{weekday:"short"});
+  return `${day} ${hh(d)} Uhr`;
+}
 
 async function getJSON(url){
   const r = await fetch(url, {cache:"no-store"});
@@ -352,6 +396,13 @@ async function loadForecast(lat, lon){
 }
 
 // ---- Rechenmodell ----------------------------------------------------------
+// Umrechnung horizontale Globalstrahlung -> Modulebene (aus dem Prognosemodell der jeweiligen Stunde)
+function transp(h){
+  const kt = kwpTot();
+  return h && h.ghi >= 30 && kt > 0 ? clamp((cfg.kwp1*h.g1 + (cfg.kwp2>0?cfg.kwp2*h.g2:0)) / (kt*h.ghi), 0.3, 3) : 1;
+}
+const pvFromGlow = (glow, h) => kwpTot() * glow * transp(h) / 1000 * (cfg.pr/100);
+
 // Verhältnis gemessene / prognostizierte Globalstrahlung der letzten (bis zu 3) Stunden
 function stationFactor(hours, today){
   const now = Date.now(), mid = +midnight();
@@ -363,11 +414,32 @@ function stationFactor(hours, today){
     pairs.push({m: pts.reduce((a,x)=>a+x.glow,0)/pts.length, f: h.ghi, end:h.end});
   }
   const dm = pairs.reduce((a,x)=>a+x.m,0), df = pairs.reduce((a,x)=>a+x.f,0);
-  const day = df >= 150 ? dm/df : null;              // Tagesbilanz (nur Info)
-  const use = pairs.filter(x => now - x.end < 4*36e5).slice(-3);  // nur frische Stunden korrigieren
+  const day = df >= 150 ? dm/df : null;
+  const use = pairs.filter(x => now - x.end < 4*36e5).slice(-3);
   const sm = use.reduce((a,x)=>a+x.m,0), sf = use.reduce((a,x)=>a+x.f,0);
   if(!use.length || sf < 150) return {f:1, n:0, day};
   return {f: clamp(sm/sf, 0.25, 1.6), n: use.length, day};
+}
+
+// PV-Leistung je abgeschlossener Stunde heute, aus der Stationsmessung abgeleitet
+function measuredHours(hours, meas){
+  if(!meas) return {list:[], kwh:0};
+  const now = Date.now(), mid = +midnight(), list = [];
+  for(const h of hours){
+    if(+h.start < mid || +h.start >= now) continue;
+    const pts = meas.today.filter(p => p.glow != null && p.t > h.start && p.t <= h.end);
+    if(!pts.length) continue;
+    const g = pts.reduce((a,p)=>a+p.glow,0)/pts.length;
+    list.push({start:h.start, end:h.end, v: pvFromGlow(g, h), done: +h.end <= now, n: pts.length});
+  }
+  // bisher erzeugte Energie: jede 10-min-Messung zählt 1/6 h
+  let kwh = 0;
+  for(const p of meas.today){
+    if(p.glow == null) continue;
+    const h = hours.find(x => p.t > x.start && p.t <= x.end);
+    kwh += pvFromGlow(p.glow, h) / 6;
+  }
+  return {list, kwh};
 }
 
 function buildModel(){
@@ -383,33 +455,46 @@ function buildModel(){
   }
   const ti = fc.days.findIndex(d => d.date.toDateString() === new Date().toDateString());
   const today = fc.days[ti] || null, tomorrow = fc.days[ti+1] || null, after = fc.days[ti+2] || null;
-  const mid1 = +midnight(new Date(),1), mid2 = +midnight(new Date(),2);
+  const mid0 = +midnight(), mid1 = +midnight(new Date(),1), mid2 = +midnight(new Date(),2);
   const future = fc.hours.filter(h => h.frac > 0);
+  const todayH = fc.hours.filter(h => +h.start >= mid0 && +h.start < mid1);
+  const tomH = fc.hours.filter(h => +h.start >= mid1 && +h.start < mid2);
   const rest = future.filter(h => +h.start < mid1).reduce((a,h)=>a + h.pvExp*h.frac, 0);
-  const tom = fc.hours.filter(h => +h.start >= mid1 && +h.end <= mid2).reduce((a,h)=>a + h.pvExp, 0);
+  const todayTotal = todayH.reduce((a,h)=>a + h.pvExp, 0);
+  const tomTotal = tomH.reduce((a,h)=>a + h.pvExp, 0);
+  const tomPeak = tomH.reduce((b,h)=> h.pvExp > (b ? b.pvExp : -1) ? h : b, null);
   const cur = fc.hours.find(h => +h.start <= now && +h.end > now) || null;
-  // Horizont: bis 3 h nach Sonnenaufgang übermorgen (deckt heute Nacht, morgen, morgen Nacht ab)
+  const meas = measuredHours(fc.hours, state.meas);
   const horizon = after ? +after.sunrise + 3*36e5 : +future[future.length-1].end;
-  return {sf, cur, future, rest, tom, today, tomorrow, horizon, next24: future.slice(0,24)};
+  return {sf, cur, future, rest, todayTotal, tomTotal, tomPeak, today, tomorrow, horizon, meas,
+          twoDays: todayH.concat(tomH), next24: future.slice(0,24)};
 }
 
+// Akku-Simulation: Notreserve ist die harte Untergrenze, darunter Netzbezug
 function simulate(E0, md){
-  const cap = cfg.bat, base = cfg.base/1000;
-  let E = clamp(E0, 0, cap), imp = 0, exp = 0, expUntilTomorrowEve = 0;
+  const cap = cfg.bat, base = cfg.base/1000, floor = cap*cfg.minSoc/100;
+  let E = clamp(E0, 0, cap), imp = 0, exp = 0, expEve = 0, low = E, lowT = new Date(), lowPre = E, full = false;
   const eve = md.tomorrow ? +md.tomorrow.sunset : Infinity;
   for(const h of md.future){
     if(+h.start >= md.horizon) break;
     E += (h.pvSafe - base) * h.frac;
-    if(E > cap){ exp += E - cap; if(+h.end <= eve) expUntilTomorrowEve += E - cap; E = cap; }
-    if(E < 0){ imp += -E; E = 0; }
+    if(E > cap){ exp += E - cap; if(+h.end <= eve) expEve += E - cap; E = cap; }
+    if(E < low){ low = E; lowT = h.end; }
+    if(!full){ if(E >= cap - 1e-6) full = true; else lowPre = Math.min(lowPre, E); }
+    if(E < floor){ imp += floor - E; E = floor; }
   }
-  return {imp, exp, expUntilTomorrowEve, E};
+  return {imp, exp, expEve, low, lowT, lowPre, full, E};
 }
+// größte Entnahme fürs Auto: Der Akku darf bis zum nächsten Vollladen nicht unter die Auto-Grenze fallen.
+// Wird er wieder voll, ist die Entnahme danach ohne Wirkung; wird er nicht voll, gilt die Grenze für den ganzen Horizont.
 function maxShift(E0, md){
-  if(simulate(E0, md).imp > 0.05) return {x:0, importAnyway: simulate(E0, md).imp};
-  let lo = 0, hi = E0;
-  for(let i=0;i<30;i++){ const m = (lo+hi)/2; if(simulate(E0-m, md).imp > 0.05) hi = m; else lo = m; }
-  return {x: lo, importAnyway: 0};
+  const res = cfg.bat*cfg.autoSoc/100, s0 = simulate(E0, md);
+  if(E0 <= res) return {x:0, s0};
+  const ok = X => { const s = simulate(E0 - X, md); return (s.full ? s.lowPre : s.low) >= res - 0.01; };
+  let lo = 0, hi = E0 - res;
+  if(ok(hi)) return {x:hi, s0};
+  for(let i=0;i<30;i++){ const m = (lo+hi)/2; if(ok(m)) lo = m; else hi = m; }
+  return {x: lo, s0};
 }
 
 function windowsOf(hours){
@@ -418,8 +503,8 @@ function windowsOf(hours){
   for(const h of hours){
     const s = h.pvExp - base;
     if(s >= cfg.big){
-      if(!cur) cur = {start:h.start, end:h.end, kwh:0, n:0, max:0};
-      cur.end = h.end; cur.kwh += s*h.frac; cur.n++; cur.max = Math.max(cur.max, s);
+      if(!cur) cur = {start:h.start, end:h.end, kwh:0, max:0};
+      cur.end = h.end; cur.kwh += s*h.frac; cur.max = Math.max(cur.max, s);
     } else if(cur){ out.push(cur); cur = null; }
   }
   if(cur) out.push(cur);
@@ -439,23 +524,51 @@ function axis(W,H,L,R,T,B,ymax,step,unit,dec){
   return s;
 }
 
-function chartForecast(hrs){
-  const W=360,H=188,L=30,R=4,T=22,B=18, iw=W-L-R, ih=H-T-B, base=cfg.base/1000;
-  const maxV = Math.max(1, base*1.6, ...hrs.map(h=>h.pvExp));
-  const step = niceStep(maxV), ymax = Math.ceil(maxV/step)*step;
-  const y = v => T + ih*(1 - v/ymax), bw = iw/Math.max(1,hrs.length);
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="PV-Prognose in kW">` + axis(W,H,L,R,T,B,ymax,step,"kW",step<1?1:0);
-  hrs.forEach((h,i)=>{
-    const v = h.pvExp, x = L + i*bw;
-    const c = v - base >= cfg.big ? "var(--good)" : v > base ? "var(--sun)" : "var(--cloud)";
-    const top = y(v), hgt = Math.max(v>0.02?2:0, T+ih-top);
-    s += `<rect x="${x+bw*.12}" y="${T+ih-hgt}" width="${bw*.76}" height="${hgt}" rx="2.5" fill="${c}"><title>${hh(h.start)}–${hh(h.end)} Uhr: ${kW(v)}</title></rect>`;
-    if(h.start.getHours()%3===0) s += `<text x="${x+bw/2}" y="${H-5}" text-anchor="middle">${hh(h.start)}</text>`;
-    if(h.start.getHours()===0 && i>0) s += `<line x1="${x}" x2="${x}" y1="${T}" y2="${T+ih}" stroke="var(--mute)" opacity=".35"/>`;
+// Heute + morgen, 48 Stundenbalken, horizontal scrollbar; Y-Achse separat fixiert
+function chartForecast(md){
+  const hrs = md.twoDays, meas = md.meas.list;
+  const H=214, T=40, B=20, ih=H-T-B, SW=17, PW=hrs.length*SW+6, AW=30, base=cfg.base/1000, now=Date.now();
+  const maxV = Math.max(1, base*1.6, ...hrs.map(h=>h.pvExp), ...meas.map(m=>m.v));
+  const step = niceStep(maxV), ymax = Math.ceil(maxV/step)*step, dec = step<1?1:0;
+  const y = v => T + ih*(1 - v/ymax);
+  const x0 = +hrs[0].start, X = t => 3 + (+t - x0)/36e5*SW;
+
+  let a = `<svg width="${AW}" height="${H}" viewBox="0 0 ${AW} ${H}" style="width:${AW}px">`;
+  for(let v=0; v<=ymax+1e-9; v+=step) a += `<text x="${AW-5}" y="${y(v)+3.5}" text-anchor="end">${num(v,dec)}</text>`;
+  a += `<text x="${AW-5}" y="${T-22}" text-anchor="end" style="font-weight:600">kW</text></svg>`;
+
+  let s = `<svg width="${PW}" height="${H}" viewBox="0 0 ${PW} ${H}" style="width:${PW}px" role="img" aria-label="PV-Prognose heute und morgen">`;
+  for(let v=0; v<=ymax+1e-9; v+=step) s += `<line x1="0" x2="${PW}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v>0?'stroke-dasharray="3 4"':''}/>`;
+  // Tageskopf: Trennlinie um Mitternacht, Tagesname mehrfach, damit er beim Scrollen sichtbar bleibt
+  [0,1].forEach(k=>{
+    const m0 = +midnight(new Date(), k), xs = X(m0);
+    if(k) s += `<line x1="${xs}" x2="${xs}" y1="2" y2="${T+ih}" stroke="var(--mute)" stroke-width="1.4" opacity=".7"/>`;
+    [0.15, 8, 16].forEach(hr=>{
+      s += `<text x="${X(m0 + hr*36e5)+4}" y="12" style="font-weight:650;fill:var(--ink);font-size:11px">${k?"Morgen":"Heute"} <tspan style="fill:var(--mute);font-weight:400">${wd(new Date(m0))}</tspan></text>`;
+    });
   });
-  const yb = y(base);
-  s += `<line x1="${L}" x2="${W-R}" y1="${yb}" y2="${yb}" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="5 4" opacity=".7"/>`;
-  return s + `</svg>`;
+  // Balken
+  hrs.forEach(h=>{
+    const v = h.pvExp, x = X(h.start), past = +h.end <= now;
+    const c = v - base >= cfg.big ? "var(--good)" : v > base ? "var(--sun)" : "var(--cloud)";
+    const hgt = Math.max(v>0.02?2:0, T+ih-y(v));
+    s += `<rect x="${x+SW*.12}" y="${T+ih-hgt}" width="${SW*.76}" height="${hgt}" rx="2.5" fill="${c}" opacity="${past?.35:1}"><title>${hh(h.start)}–${hh(h.end)} Uhr: ${kW(v)} erwartet</title></rect>`;
+    if(h.start.getHours()%3===0) s += `<text x="${x+SW/2}" y="${H-5}" text-anchor="middle">${hh(h.start)}</text>`;
+  });
+  // Grundlast
+  s += `<line x1="0" x2="${PW}" y1="${y(base)}" y2="${y(base)}" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="5 4" opacity=".7"/>`;
+  // bisher laut Station (abgeschlossene Stunden + laufende Stunde)
+  if(meas.length){
+    const pts = meas.map(m => `${(X(m.start)+SW/2).toFixed(1)},${y(m.v).toFixed(1)}`);
+    if(pts.length > 1) s += `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    meas.forEach(m => { s += `<circle cx="${X(m.start)+SW/2}" cy="${y(m.v)}" r="2.6" fill="var(--ink)"><title>${hh(m.start)}–${hh(m.end)} Uhr: ${kW(m.v)} laut Station</title></circle>`; });
+  }
+  // Jetzt-Markierung
+  const xn = X(now);
+  s += `<rect x="${xn-1.5}" y="${T-12}" width="3" height="${ih+12}" fill="var(--now)" rx="1.5"/>`;
+  s += `<rect x="${xn-24}" y="${T-26}" width="48" height="17" rx="8.5" fill="var(--now)"/>`;
+  s += `<text x="${xn}" y="${T-14}" text-anchor="middle" style="fill:#fff;font-weight:700;font-size:10.5px">${fmtT(new Date(now))}</text>`;
+  return {axis:a, plot:s + `</svg>`, nowX:xn};
 }
 
 function chartToday(meas, fcHours){
@@ -467,7 +580,6 @@ function chartToday(meas, fcHours){
   const step = niceStep(maxV), ymax = Math.ceil(maxV/step)*step;
   const y = v => T + ih*(1 - v/ymax);
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Globalstrahlung heute">` + axis(W,H,L,R,T,B,ymax,step,"W/m²",0);
-  // gemessene Fläche (Segmente bei Datenlücken trennen)
   let seg = [];
   const flush = () => {
     if(seg.length > 1){
@@ -479,12 +591,10 @@ function chartToday(meas, fcHours){
   };
   pts.forEach((p,i)=>{ if(i && +p.t - +pts[i-1].t > 25*6e4) flush(); seg.push(p); });
   flush();
-  // Prognose gestrichelt
   if(fch.length > 1){
     const d = fch.map((h,i)=>`${i?"L":"M"}${x(+h.end-18e5).toFixed(1)},${y(h.ghi).toFixed(1)}`).join("");
     s += `<path d="${d}" fill="none" stroke="var(--mute)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
   }
-  // Sonnenband
   const by = T+ih+4;
   s += `<rect x="${L}" y="${by}" width="${iw}" height="7" rx="2" fill="var(--soft)"/>`;
   if(meas) meas.today.forEach(p=>{
@@ -493,7 +603,7 @@ function chartToday(meas, fcHours){
   });
   [0,3,6,9,12,15,18,21,24].forEach(h=>{ s += `<text x="${L + iw*h/24}" y="${H-4}" text-anchor="middle">${h===24?"":String(h).padStart(2,"0")}</text>`; });
   const xn = x(Date.now());
-  s += `<line x1="${xn}" x2="${xn}" y1="${T}" y2="${T+ih}" stroke="var(--ink)" stroke-width="1.2" opacity=".45"/>`;
+  s += `<line x1="${xn}" x2="${xn}" y1="${T}" y2="${T+ih}" stroke="var(--now)" stroke-width="2"/>`;
   return s + `</svg>`;
 }
 
@@ -509,7 +619,7 @@ function icon(h){
 }
 
 function renderNow(md){
-  const m = state.meas, st = state.st;
+  const m = state.meas;
   const now = new Date();
   const night = md && md.today ? (now < md.today.sunrise || now > md.today.sunset) : (m && m.glow!=null && m.glow < 5);
 
@@ -525,19 +635,10 @@ function renderNow(md){
     $("kToday").textContent = fmtH(m.today.reduce((a,x)=>a+(x.so||0),0));
   }
 
-  // PV jetzt: Stationsstrahlung auf Modulebene umgerechnet
   let pvNow = null, src = "";
   const fresh = m && m.time && (Date.now() - m.time) < 40*6e4 && m.glow != null;
-  if(md && md.cur){
-    const c = md.cur, kwpTot = cfg.kwp1 + (cfg.kwp2>0?cfg.kwp2:0);
-    if(fresh){
-      const tr = c.ghi >= 30 && kwpTot > 0 ? clamp((cfg.kwp1*c.g1 + (cfg.kwp2>0?cfg.kwp2*c.g2:0)) / (kwpTot*c.ghi), 0.3, 3) : 1;
-      pvNow = kwpTot * m.glow * tr / 1000 * (cfg.pr/100);
-      src = "aus Stationsmessung";
-    } else { pvNow = c.pvExp; src = "aus Prognose"; }
-  } else if(fresh){
-    pvNow = (cfg.kwp1 + cfg.kwp2) * m.glow / 1000 * (cfg.pr/100); src = "aus Stationsmessung";
-  }
+  if(fresh){ pvNow = pvFromGlow(m.glow, md && md.cur); src = "aus Stationsmessung"; }
+  else if(md && md.cur){ pvNow = md.cur.pvExp; src = "aus Prognose"; }
   $("kPv").textContent = pvNow != null ? kW(pvNow) : "–";
   $("kPvSrc").textContent = src || "geschätzt";
 
@@ -545,7 +646,7 @@ function renderNow(md){
   if(pvNow == null){ advice(el, "", "Noch keine Daten", ""); return; }
   const surplus = pvNow - base;
   const win = md ? windowsOf(md.next24)[0] : null;
-  const winTxt = win ? `Nächstes gutes Fenster: ${hh(win.start)}–${hh(win.end)} Uhr (bis ${kW(win.max)} Überschuss).` : "In den nächsten 24 h kein Fenster mit großem Überschuss.";
+  const winTxt = win ? `Nächstes gutes Fenster: ${when(win.start)} bis ${hh(win.end)} Uhr (bis ${kW(win.max)} Überschuss).` : "In den nächsten 24 h kein Fenster mit großem Überschuss.";
   if(night || pvNow < 0.05){
     advice(el, "bad", "Keine PV-Erzeugung", `Haus läuft aus dem Speicher. ${winTxt}`);
   } else if(surplus >= cfg.big){
@@ -557,43 +658,36 @@ function renderNow(md){
   }
 }
 
-function renderPlan(md){
-  $("soc").value = soc;
-  const E0 = cfg.bat * soc/100;
-  $("socOut").textContent = `${soc} % · ${kWh(E0)}`;
-  const el = $("advicePlan");
-  if(!md){ advice(el, "", "Warte auf Prognose …", ""); return; }
-  $("pvRest").textContent = kWh(md.rest);
-  $("pvTomorrow").textContent = kWh(md.tom);
-  const r = maxShift(E0, md);
-  const after = simulate(E0 - r.x, md);
-  $("pvExport").textContent = kWh(after.expUntilTomorrowEve);
-  if(r.importAnyway > 0){
-    advice(el, "bad", "Speicher halten", `Schon ohne Auto-Laden fehlen voraussichtlich ca. ${kWh(r.importAnyway)} bis übermorgen früh.`);
-  } else if(r.x >= Math.max(1, cfg.bat*0.3)){
-    advice(el, "good", `Bis zu ${kWh(r.x)} ins Auto`, `Die Prognose füllt den Speicher danach wieder auf, ohne Netzbezug.` + (after.expUntilTomorrowEve > 1 ? ` Morgen gehen trotzdem noch ca. ${kWh(after.expUntilTomorrowEve)} ins Netz: Auto zusätzlich tagsüber direkt mit PV laden.` : ""));
-  } else if(r.x >= 0.5){
-    advice(el, "mid", `Nur ca. ${kWh(r.x)} ins Auto`, "Mehr würde den Speicher vor der nächsten Sonne leeren.");
-  } else {
-    advice(el, "bad", "Nichts verschieben", "Der Speicher wird für die Nacht und die schwache PV morgen gebraucht.");
-  }
-}
-
 function renderForecast(md){
-  const hrs = md.next24;
-  const tot = hrs.reduce((a,h)=>a+h.pvExp*h.frac,0);
-  $("fcSub").textContent = `Erwartete PV-Leistung deiner Anlage je Stunde · Summe ${kWh(tot)}`;
+  $("fcSub").textContent = `Erwartete Leistung deiner Anlage (${num(kwpTot(),2)} kWp) je Stunde`;
   $("lgBig").textContent = num(cfg.big, cfg.big%1?1:0);
-  $("lgBase").textContent = num(cfg.base/1000, 1);
-  $("chartFc").innerHTML = chartForecast(hrs);
-  const wins = windowsOf(hrs);
+  $("lgBase").textContent = num(cfg.base/1000, 2);
+  $("sumTodayL").textContent = `Heute prognostiziert · ${wd(midnight())}`;
+  $("sumTomL").textContent = `Morgen prognostiziert · ${wd(midnight(new Date(),1))}`;
+  $("sumToday").textContent = kWh(md.todayTotal);
+  $("sumTodaySub").textContent = state.meas
+    ? `bisher ca. ${kWh(md.meas.kwh)} laut Station · noch ca. ${kWh(md.rest)} erwartet`
+    : `noch ca. ${kWh(md.rest)} erwartet`;
+  $("sumTom").textContent = kWh(md.tomTotal);
+  const w = windowsOf(md.twoDays.filter(h => +h.start >= +midnight(new Date(),1)))[0];
+  $("sumTomSub").textContent = md.tomPeak && md.tomPeak.pvExp > 0.1
+    ? `Spitze ca. ${kW(md.tomPeak.pvExp)} um ${hh(md.tomPeak.start)} Uhr` + (w ? ` · Überschuss ${hh(w.start)}–${hh(w.end)} Uhr` : "")
+    : "kaum PV-Ertrag erwartet";
+
+  const c = chartForecast(md), sc = $("fcScroll");
+  const keep = state.fcScrolled ? sc.scrollLeft : null;
+  $("fcAxis").innerHTML = c.axis;
+  $("chartFc").innerHTML = c.plot;
+  // Beim ersten Anzeigen "jetzt" ins linke Drittel scrollen, danach Position des Nutzers behalten
+  const evening = md.today && Date.now() > +md.today.sunset;   // abends: "jetzt" ganz links, damit morgen sichtbar ist
+  const setPos = () => { sc.scrollLeft = keep != null ? keep : Math.max(0, c.nowX - sc.clientWidth*(evening ? 0.06 : 0.3)); state.fcScrolled = true; };
+  if(typeof requestAnimationFrame === "function") requestAnimationFrame(setPos); else setPos();
+
+  const wins = windowsOf(md.next24);
   $("windows").innerHTML = wins.length
-    ? wins.slice(0,3).map(w=>{
-        const day = w.start.toDateString() === new Date().toDateString() ? "heute" : "morgen";
-        return `<div class="win"><span>${day} ${hh(w.start)}–${hh(w.end)} Uhr</span><span>bis ${kW(w.max)} · ca. ${kWh(w.kwh)} Überschuss</span></div>`;
-      }).join("")
+    ? wins.slice(0,3).map(w=>`<div class="win"><span>${when(w.start).replace(" Uhr","")}–${hh(w.end)} Uhr</span><span>bis ${kW(w.max)} · ca. ${kWh(w.kwh)} Überschuss</span></div>`).join("")
     : `<div class="win"><span>Kein Zeitraum mit ≥ ${kW(cfg.big)} Überschuss</span><span>Verbraucher klein halten</span></div>`;
-  $("strip").innerHTML = hrs.map(h=>`
+  $("strip").innerHTML = md.next24.map(h=>`
     <div class="hr">
       <div class="t">${hh(h.start)}–${hh(h.end)}</div>
       <div class="i">${icon(h)}</div>
@@ -605,6 +699,42 @@ function renderForecast(md){
   $("corrNote").textContent = md.sf.n
     ? `Stations-Korrektur: Die Station misst in den letzten ${md.sf.n} h ${Math.round(md.sf.f*100)} % der prognostizierten Strahlung. Die nächsten Stunden sind entsprechend angepasst.${dayTxt}`
     : `Stations-Korrektur: gerade keine (zu wenig Sonne in den letzten Stunden für einen Vergleich), Prognose unverändert.${dayTxt}`;
+}
+
+function renderPlan(md){
+  $("soc").value = soc;
+  const E0 = cfg.bat * soc/100;
+  $("socOut").textContent = `${soc} % · ${kWh(E0)}`;
+  $("planSub").textContent = `Wie viel kann jetzt ins Auto, ohne dass der Akku bis übermorgen früh unter ${cfg.autoSoc} % fällt? (Notreserve ${cfg.minSoc} %)`;
+  const el = $("advicePlan");
+  if(!md){ advice(el, "", "Warte auf Prognose …", ""); return; }
+  const r = maxShift(E0, md), s0 = r.s0;
+  if(r.x < 0.5) r.x = 0;
+  const after = simulate(E0 - r.x, md);
+  $("socAfter").textContent = pct(E0 - r.x);
+  $("socLow").textContent = `${pct(Math.max(0, after.low))} · ${when(after.lowT)}`;
+  $("pvExport").textContent = kWh(after.expEve);
+  const res = cfg.bat*cfg.autoSoc/100;
+  const nightWarn = s0.imp > 0.05
+    ? ` Achtung: Auch ohne Auto erreicht der Akku ${when(s0.lowT)} die Notreserve (${cfg.minSoc} %), danach ca. ${kWh(s0.imp)} Netzbezug.`
+    : s0.low < res ? ` Hinweis: Auch ohne Auto sinkt der Akku ${when(s0.lowT)} auf ca. ${pct(s0.low)}.` : "";
+  const exportTxt = after.expEve > 1 ? ` Bis morgen Abend gehen trotzdem noch ca. ${kWh(after.expEve)} ins Netz: Auto zusätzlich tagsüber direkt mit PV laden.` : "";
+  if(E0 <= res + 0.05){
+    advice(el, "bad", "Nichts verschieben", `Der Akku ist bereits auf oder unter deiner Auto-Grenze von ${cfg.autoSoc} %.`);
+  } else if(r.x >= Math.max(1, cfg.bat*0.2)){
+    const why = s0.low >= res
+      ? `Der Akku bleibt bis übermorgen früh über ${cfg.autoSoc} %, tiefster Stand ca. ${pct(after.low)} ${when(after.lowT)}.`
+      : `Die PV füllt den Akku danach wieder auf, die Nacht wird dadurch nicht knapper.${nightWarn}`;
+    advice(el, "good", `Bis zu ${kWh(r.x)} ins Auto`, why + exportTxt);
+  } else if(s0.imp > 0.05){
+    advice(el, "bad", "Speicher halten: Netzbezug droht", `Schon ohne Auto-Laden erreicht der Akku ${when(s0.lowT)} die Notreserve von ${cfg.minSoc} %; danach ca. ${kWh(s0.imp)} aus dem Netz. Große Verbraucher vermeiden.`);
+  } else if(s0.low < res){
+    advice(el, "bad", "Speicher halten", `Schon ohne Auto-Laden sinkt der Akku ${when(s0.lowT)} auf ca. ${pct(s0.low)}, also unter deine Grenze von ${cfg.autoSoc} %.`);
+  } else if(r.x >= 0.5){
+    advice(el, "mid", `Nur ca. ${kWh(r.x)} ins Auto`, `Mehr würde den Akku ${when(after.lowT)} unter ${cfg.autoSoc} % drücken.`);
+  } else {
+    advice(el, "bad", "Nichts verschieben", `Der Speicher wird für die Nacht und die PV-Lücke bis ${when(after.lowT)} gebraucht.`);
+  }
 }
 
 function renderRows(md){
@@ -624,11 +754,12 @@ function renderRows(md){
 function renderAll(){
   const md = buildModel();
   renderNow(md);
-  renderPlan(md);
   if(md) renderForecast(md);
+  renderPlan(md);
   $("chartToday").innerHTML = chartToday(state.meas, state.fc ? state.fc.hours : []);
   renderRows(md);
-  $("cfgBanner").hidden = !!store.get("cfg");
+  const s = store.get("cfg");
+  $("cfgBanner").hidden = !!(s && s.batConfirmed);
 }
 
 function showErr(id, e){ const el=$(id); el.hidden=false; el.textContent = "Fehler: " + (e && e.message || e); }
@@ -656,14 +787,15 @@ async function refresh(){
 }
 
 // ---- Einstellungen ---------------------------------------------------------
-const FIELDS = ["kwp1","az1","tilt1","kwp2","az2","tilt2","bat","base","big","pr","safety"];
+const FIELDS = ["kwp1","az1","tilt1","kwp2","az2","tilt2","bat","autoSoc","minSoc","base","big","pr","safety"];
 function fillForm(){
   ["c_az1","c_az2"].forEach(id=>{ $(id).innerHTML = AZ.map(([n,v])=>`<option value="${v}">${n}</option>`).join(""); });
   FIELDS.forEach(k => { $("c_"+k).value = cfg[k]; });
 }
 $("cfgSave").addEventListener("click", ()=>{
-  const n = {};
+  const n = {v:DEF.v, batConfirmed:true};
   FIELDS.forEach(k => { const v = parseFloat(String($("c_"+k).value).replace(",", ".")); n[k] = isNaN(v) ? DEF[k] : v; });
+  if(n.minSoc > n.autoSoc) n.minSoc = n.autoSoc;
   cfg = n; store.set("cfg", cfg);
   $("cfgDetails").open = false;
   refresh();
