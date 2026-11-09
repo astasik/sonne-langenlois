@@ -164,6 +164,24 @@ footer a{color:inherit}
     <div class="err" id="errFc" hidden></div>
   </section>
 
+  <!-- HEUTE GEMESSEN -->
+  <section class="card">
+    <h2>Heute gemessen</h2>
+    <div class="h2sub">Stationsmessung im Vergleich zur Prognose</div>
+    <div class="kpis" style="margin:0 0 14px">
+      <div class="kpi"><span>Prognose heute</span><b id="tFc">–</b><small id="tFcSub">ganzer Tag, Wettermodell</small></div>
+      <div class="kpi"><span>Erzeugt bisher</span><b id="tAct">–</b><small>berechnet aus Stationsmessung</small></div>
+      <div class="kpi"><span>Abweichung</span><b id="tDev">–</b><small id="tDevSub">zur Prognose bis jetzt</small></div>
+    </div>
+    <div style="font-size:.8rem;color:var(--mute);margin-bottom:4px">Globalstrahlung der Station</div>
+    <div id="chartToday"></div>
+    <div class="legend">
+      <span><i style="background:var(--sun)"></i>gemessen (W/m²)</span>
+      <span><i style="background:none;border-top:2px dashed var(--mute);height:0;border-radius:0"></i>Prognose</span>
+      <span><i style="background:var(--sun2)"></i>Band unten: Sonnenschein ja/nein</span>
+    </div>
+  </section>
+
   <!-- SPEICHER -> AUTO -->
   <section class="card">
     <h2>Speicher → Auto</h2>
@@ -178,18 +196,6 @@ footer a{color:inherit}
       <div>Akku danach<b id="socAfter">–</b></div>
       <div>Tiefster Stand<b id="socLow">–</b></div>
       <div>Einspeisung bis morgen Abend<b id="pvExport">–</b></div>
-    </div>
-  </section>
-
-  <!-- HEUTE GEMESSEN -->
-  <section class="card">
-    <h2>Heute gemessen</h2>
-    <div class="h2sub">Globalstrahlung der Station im Vergleich zur Prognose</div>
-    <div id="chartToday"></div>
-    <div class="legend">
-      <span><i style="background:var(--sun)"></i>gemessen (W/m²)</span>
-      <span><i style="background:none;border-top:2px dashed var(--mute);height:0;border-radius:0"></i>Prognose</span>
-      <span><i style="background:var(--sun2)"></i>Band unten: Sonnenschein ja/nein</span>
     </div>
   </section>
 
@@ -238,7 +244,8 @@ footer a{color:inherit}
       <summary>So rechnet die App</summary>
       <ul class="explain">
         <li><b>Messwerte</b> kommen live von der Wetterstation Langenlois (GeoSphere Austria, alle 10 Minuten).</li>
-        <li><b>Die Prognose</b> stammt aus Wettermodellen (Open-Meteo, u. a. DWD ICON) für den Standort der Station, getrennt gerechnet für dein Ost- und Westfeld. Eine Station kann selbst nicht vorhersagen.</li>
+        <li><b>Die Prognose</b> stammt aus zwei Wettermodellen (DWD ICON und ECMWF IFS, über Open-Meteo) für den Standort der Station, getrennt gerechnet für dein Ost- und Westfeld. Je Stunde zählt das vorsichtigere Modell. Im Vergleich mit 60 Tagen Stationsmessung war das genauer als jedes Einzelmodell, vor allem an trüben Tagen. Eine Station kann selbst nicht vorhersagen.</li>
+        <li><b>„Erzeugt bisher“</b> ist aus der Strahlungsmessung der Station berechnet, nicht am Wechselrichter gemessen. Der echte Zählerwert kann abweichen.</li>
         <li><b>Stations-Korrektur:</b> Die App vergleicht die gemessene Strahlung der letzten Stunden mit der Prognose. Liegt die Station z. B. 20 % darunter, werden die nächsten Stunden entsprechend angepasst. Die Korrektur klingt nach etwa 3 Stunden ab.</li>
         <li><b>PV-Leistung</b> = Strahlung auf Modulebene × kWp × Systemwirkungsgrad. „PV jetzt“ und die schwarze Linie im Diagramm rechnen die gemessene Strahlung der Station auf deine Module um.</li>
         <li><b>Speicher → Auto:</b> Die App simuliert deinen Akku Stunde für Stunde bis übermorgen früh: PV-Prognose minus Sicherheitsabschlag, Grundlast konstant. Empfohlen wird die größte Menge, bei der der Akku nicht unter die Auto-Grenze fällt (regulär 32 von 40 kWh nutzbar). Die Notreserve bis 35 kWh wird nur im Notfall angetastet, darunter käme Strom aus dem Netz. Der Akkustand im Regler ist der Prozentwert, den der Wechselrichter anzeigt (bezogen auf 40 kWh).</li>
@@ -248,7 +255,7 @@ footer a{color:inherit}
 
   <footer>
     Messdaten: <a href="https://data.hub.geosphere.at/dataset/tawes-v1-10min" target="_blank" rel="noopener">GeoSphere Austria TAWES</a> (CC BY 4.0) ·
-    Prognose: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)<br>
+    Prognose: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>, Modelle DWD ICON und ECMWF IFS (CC BY 4.0)<br>
     <span id="updated"></span>
   </footer>
 </main>
@@ -377,23 +384,37 @@ function omURL(params){
   u.search = new URLSearchParams(Object.assign({timezone:"Europe/Vienna", timeformat:"unixtime", past_days:1, forecast_days:3}, params));
   return u;
 }
+// Zwei Modelle (DWD ICON und ECMWF IFS); je Stunde zählt das mit der geringeren Globalstrahlung.
+// Auswertung 60 Tage gegen die Station Langenlois: Beide überschätzen trübe Tage, das stündliche Minimum
+// halbiert dort den Fehler und ist im Mittel ohne Bias. GeoSphere C-LAEF war in den ersten Tagen nicht besser.
+const MODELS = ["icon_seamless", "ecmwf_ifs025"];
+const MODEL_NAMES = {icon_seamless:"ICON", ecmwf_ifs025:"ECMWF"};
 async function loadForecast(lat, lon){
-  const reqs = [getJSON(omURL({latitude:lat, longitude:lon,
+  const models = MODELS.join(",");
+  const reqs = [getJSON(omURL({latitude:lat, longitude:lon, models,
     hourly:"sunshine_duration,cloud_cover,temperature_2m,precipitation_probability,shortwave_radiation,global_tilted_irradiance,is_day",
     daily:"sunrise,sunset", tilt:cfg.tilt1, azimuth:cfg.az1}))];
-  if(cfg.kwp2 > 0) reqs.push(getJSON(omURL({latitude:lat, longitude:lon, hourly:"global_tilted_irradiance", tilt:cfg.tilt2, azimuth:cfg.az2})));
+  if(cfg.kwp2 > 0) reqs.push(getJSON(omURL({latitude:lat, longitude:lon, models, hourly:"global_tilted_irradiance", tilt:cfg.tilt2, azimuth:cfg.az2})));
   const [d, d2] = await Promise.all(reqs);
   const h = d.hourly, pr = cfg.pr/100;
+  const col = (o, name, m) => o[name + "_" + m] || o[name] || [];
+  const first = (o, name, i) => { for(const m of MODELS){ const v = col(o, name, m)[i]; if(v != null) return v; } return null; };
   const hours = h.time.map((t,i)=>{
     const end = new Date(t*1000), start = new Date(t*1000 - 36e5);
-    const g1 = h.global_tilted_irradiance[i] || 0;
-    const g2 = d2 ? (d2.hourly.global_tilted_irradiance[i] || 0) : 0;
-    return { start, end, ghi:h.shortwave_radiation[i]||0, g1, g2,
+    // Modell mit der geringeren Globalstrahlung in dieser Stunde
+    let m = null, ghi = null;
+    for(const k of MODELS){ const v = col(h, "shortwave_radiation", k)[i]; if(v != null && (ghi == null || v < ghi)){ ghi = v; m = k; } }
+    if(m == null) m = MODELS[0];
+    const g1 = col(h, "global_tilted_irradiance", m)[i] || 0;
+    const g2 = d2 ? (col(d2.hourly, "global_tilted_irradiance", m)[i] || 0) : 0;
+    const sun = col(h, "sunshine_duration", m)[i], cc = col(h, "cloud_cover", m)[i];
+    return { start, end, ghi: ghi || 0, g1, g2, model: m,
       pvRaw: (cfg.kwp1*g1 + (cfg.kwp2>0?cfg.kwp2*g2:0)) / 1000 * pr,
-      sun:(h.sunshine_duration[i]||0)/60, cc:h.cloud_cover[i], temp:h.temperature_2m[i],
-      pp:h.precipitation_probability ? h.precipitation_probability[i] : null, day:h.is_day[i] };
+      sun: (sun != null ? sun : first(h, "sunshine_duration", i) || 0)/60,
+      cc: cc != null ? cc : first(h, "cloud_cover", i),
+      temp: first(h, "temperature_2m", i), pp: first(h, "precipitation_probability", i), day: first(h, "is_day", i) };
   });
-  const days = d.daily.time.map((t,i)=>({date:new Date(t*1000), sunrise:new Date(d.daily.sunrise[i]*1000), sunset:new Date(d.daily.sunset[i]*1000)}));
+  const days = d.daily.time.map((t,i)=>({date:new Date(t*1000), sunrise:new Date(first(d.daily,"sunrise",i)*1000), sunset:new Date(first(d.daily,"sunset",i)*1000)}));
   return {hours, days};
 }
 
@@ -463,12 +484,14 @@ function buildModel(){
   const tomH = fc.hours.filter(h => +h.start >= mid1 && +h.start < mid2);
   const rest = future.filter(h => +h.start < mid1).reduce((a,h)=>a + h.pvExp*h.frac, 0);
   const todayTotal = todayH.reduce((a,h)=>a + h.pvExp, 0);
+  const todayRaw = todayH.reduce((a,h)=>a + h.pvRaw, 0);                 // reine Modellprognose, ohne Stations-Korrektur
+  const rawSoFar = todayH.reduce((a,h)=>a + h.pvRaw*(1-h.frac), 0);     // davon bis jetzt
   const tomTotal = tomH.reduce((a,h)=>a + h.pvExp, 0);
   const tomPeak = tomH.reduce((b,h)=> h.pvExp > (b ? b.pvExp : -1) ? h : b, null);
   const cur = fc.hours.find(h => +h.start <= now && +h.end > now) || null;
   const meas = measuredHours(fc.hours, state.meas);
   const horizon = after ? +after.sunrise + 3*36e5 : +future[future.length-1].end;
-  return {sf, cur, future, rest, todayTotal, tomTotal, tomPeak, today, tomorrow, horizon, meas,
+  return {sf, cur, future, rest, todayRaw, rawSoFar, todayTotal, tomTotal, tomPeak, today, tomorrow, horizon, meas,
           twoDays: todayH.concat(tomH), next24: future.slice(0,24)};
 }
 
@@ -759,6 +782,17 @@ function renderAll(){
   if(md) renderForecast(md);
   renderPlan(md);
   $("chartToday").innerHTML = chartToday(state.meas, state.fc ? state.fc.hours : []);
+  if(md){
+    $("tFc").textContent = kWh(md.todayRaw);
+    if(state.meas){
+      $("tAct").textContent = kWh(md.meas.kwh);
+      if(md.rawSoFar >= 0.3){
+        const dev = Math.round((md.meas.kwh/md.rawSoFar - 1)*100);
+        $("tDev").textContent = `${dev>0?"+":dev<0?"−":"±"}${Math.abs(dev)} %`;
+        $("tDevSub").textContent = `Prognose bis jetzt: ${kWh(md.rawSoFar)}`;
+      } else { $("tDev").textContent = "–"; $("tDevSub").textContent = "noch zu wenig Sonne"; }
+    }
+  }
   renderRows(md);
   const s = store.get("cfg");
   $("cfgBanner").hidden = !!(s && s.batConfirmed);
